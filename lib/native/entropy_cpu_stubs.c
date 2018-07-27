@@ -39,6 +39,19 @@ static inline uint32_t read_virtual_count () {
 }
 #endif /* arm */
 
+#if defined (__XTENSA__)
+
+#include <esp_system.h>
+
+static inline uint32_t read_count () {
+  uint32_t count;
+  __asm__ __volatile__("rsr.ccount %0":"=r"(count));
+  return count;
+}
+
+
+#endif /* xtensa esp32 */
+
 enum cpu_rng_t {
   RNG_NONE   = 0,
   RNG_RDRAND = 1,
@@ -63,6 +76,8 @@ static void detect () {
       if (ebx & bit_RDSEED) __cpu_rng = RNG_RDSEED;
     }
   }
+#elif defined(__XTENSA__)
+  __cpu_rng = RNG_RDRAND;
 #endif
 }
 
@@ -71,6 +86,8 @@ CAMLprim value caml_cycle_counter (value unit) {
   return Val_long (__rdtsc ());
 #elif defined (__arm__)
   return Val_long (read_virtual_count ());
+#elif defined (__XTENSA__)
+  return Val_long (read_count());
 #else
 #error ("No known cycle-counting instruction.")
 #endif
@@ -85,9 +102,11 @@ CAMLprim value caml_cpu_random (value unit) {
     _rdrand_step (&r);
   }
   return Val_long (r); /* Zeroed-out if carry == 0. */
-#else
+#elif defined (__arm__)
   /* ARM: CPU-assisted randomness here. */
   return Val_long (0);
+#elif defined (__XTENSA__)
+  return Val_long (esp_random());
 #endif
 }
 
